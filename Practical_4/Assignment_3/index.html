@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MobileNet V1 vs V2 Comparison</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+
+<style>
+
+body{
+font-family: Arial;
+background:#f4f4f4;
+text-align:center;
+padding:40px;
+}
+
+.container{
+background:white;
+width:700px;
+margin:auto;
+padding:25px;
+border-radius:10px;
+box-shadow:0 0 10px gray;
+}
+
+img{
+margin-top:10px;
+border-radius:8px;
+max-width:300px;
+}
+
+button{
+padding:10px 20px;
+margin-top:15px;
+background:#28a745;
+color:white;
+border:none;
+border-radius:6px;
+cursor:pointer;
+}
+
+.results{
+display:flex;
+justify-content:space-between;
+margin-top:20px;
+}
+
+.box{
+width:45%;
+background:#f3f3f3;
+padding:10px;
+border-radius:6px;
+text-align:left;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Image Classification Comparison</h2>
+<p>MobileNet V1 vs MobileNet V2</p>
+
+<input type="file" id="upload">
+
+<br>
+
+<img id="preview">
+
+<br>
+
+<button onclick="classifyImage()">Classify Image</button>
+
+<div class="results">
+
+<div class="box">
+<h3>MobileNet V1</h3>
+<div id="result1">Waiting...</div>
+</div>
+
+<div class="box">
+<h3>MobileNet V2</h3>
+<div id="result2">Waiting...</div>
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+let modelV1;
+let modelV2;
+
+const image = document.getElementById("preview");
+
+// Load models
+async function loadModels(){
+
+modelV1 = await mobilenet.load({
+version:1,
+alpha:1.0
+});
+
+modelV2 = await mobilenet.load({
+version:2,
+alpha:1.0
+});
+
+console.log("Models Loaded");
+
+}
+
+loadModels();
+
+// Show uploaded image
+document.getElementById("upload").addEventListener("change", function(e){
+
+const reader = new FileReader();
+
+reader.onload = function(event){
+image.src = event.target.result;
+};
+
+reader.readAsDataURL(e.target.files[0]);
+
+});
+
+// Classification function
+async function classifyImage(){
+
+// MobileNet V1
+let start1 = performance.now();
+
+const pred1 = await modelV1.classify(image);
+
+let end1 = performance.now();
+
+let time1 = (end1 - start1).toFixed(2);
+
+
+// MobileNet V2
+let start2 = performance.now();
+
+const pred2 = await modelV2.classify(image);
+
+let end2 = performance.now();
+
+let time2 = (end2 - start2).toFixed(2);
+
+
+// Display results
+let output1 = "";
+let output2 = "";
+
+pred1.slice(0,3).forEach(p=>{
+output1 += p.className + 
+" : " + (p.probability*100).toFixed(2) + "%<br>";
+});
+
+output1 += "<br><b>Inference Time:</b> " + time1 + " ms";
+
+
+pred2.slice(0,3).forEach(p=>{
+output2 += p.className + 
+" : " + (p.probability*100).toFixed(2) + "%<br>";
+});
+
+output2 += "<br><b>Inference Time:</b> " + time2 + " ms";
+
+
+document.getElementById("result1").innerHTML = output1;
+document.getElementById("result2").innerHTML = output2;
+
+}
+
+</script>
+
+</body>
+</html>

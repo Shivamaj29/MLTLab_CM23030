@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Image Classification with MobileNet</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+
+<style>
+
+body{
+font-family: Arial;
+background: linear-gradient(135deg,#667eea,#764ba2);
+text-align:center;
+padding:40px;
+color:white;
+}
+
+.container{
+background:white;
+color:black;
+width:500px;
+margin:auto;
+padding:25px;
+border-radius:10px;
+box-shadow:0 5px 15px rgba(0,0,0,0.3);
+}
+
+img{
+margin-top:15px;
+border-radius:10px;
+max-width:100%;
+}
+
+button{
+padding:10px 20px;
+margin-top:10px;
+background:#28a745;
+color:white;
+border:none;
+border-radius:6px;
+cursor:pointer;
+}
+
+#results{
+margin-top:20px;
+background:#f2f2f2;
+padding:10px;
+border-radius:6px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Image Classification</h2>
+<p>MobileNet + TensorFlow.js</p>
+
+<input type="file" id="imageUpload">
+
+<br>
+
+<img id="preview" width="300">
+
+<br>
+
+<button onclick="classifyImage()">Classify Image</button>
+
+<div id="results">Top predictions will appear here</div>
+
+</div>
+
+<script>
+
+let model;
+let image = document.getElementById("preview");
+
+// Load MobileNet
+async function loadModel(){
+model = await mobilenet.load();
+console.log("MobileNet Loaded");
+}
+
+loadModel();
+
+// Show uploaded image
+document.getElementById("imageUpload").addEventListener("change", function(event){
+
+const file = event.target.files[0];
+const reader = new FileReader();
+
+reader.onload = function(e){
+image.src = e.target.result;
+};
+
+reader.readAsDataURL(file);
+
+});
+
+// Classify image
+async function classifyImage(){
+
+const predictions = await model.classify(image);
+
+let output = "<b>Top 3 Predictions</b><br><br>";
+
+predictions.slice(0,3).forEach(p => {
+
+output += p.className + 
+" : " + (p.probability*100).toFixed(2) + "%<br>";
+
+});
+
+document.getElementById("results").innerHTML = output;
+
+}
+
+</script>
+
+</body>
+</html>

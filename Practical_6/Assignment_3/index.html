@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>RNN vs Dense Sentiment Comparison</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+<style>
+
+body{
+font-family: Arial;
+background:#f4f4f4;
+text-align:center;
+padding:40px;
+}
+
+.container{
+background:white;
+width:450px;
+margin:auto;
+padding:25px;
+border-radius:10px;
+box-shadow:0 0 10px gray;
+}
+
+textarea{
+width:90%;
+height:80px;
+margin-top:10px;
+}
+
+button{
+margin-top:10px;
+padding:10px 20px;
+background:green;
+color:white;
+border:none;
+cursor:pointer;
+}
+
+.result{
+margin-top:20px;
+font-size:18px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Sentiment Analysis</h2>
+<h3>Dense Network vs RNN</h3>
+
+<textarea id="text" placeholder="Enter a sentence"></textarea>
+<br>
+
+<button onclick="predict()">Test Sentence</button>
+
+<div class="result" id="output"></div>
+
+</div>
+
+<script>
+
+// Dataset
+const sentences = [
+"I love this product",
+"This is amazing",
+"I am very happy",
+"This is wonderful",
+"I like this",
+
+"I hate this",
+"This is terrible",
+"I am sad",
+"This product is bad",
+"I dislike this"
+];
+
+const labels = [1,1,1,1,1,0,0,0,0,0];
+
+// Build vocabulary
+let vocab = {};
+let index = 1;
+
+sentences.forEach(s=>{
+s.toLowerCase().split(" ").forEach(w=>{
+if(!vocab[w]){
+vocab[w] = index++;
+}
+});
+});
+
+// Encode sentence
+function encode(text){
+
+let words = text.toLowerCase().split(" ");
+let arr = new Array(5).fill(0);
+
+words.slice(0,5).forEach((w,i)=>{
+arr[i] = vocab[w] || 0;
+});
+
+return arr;
+}
+
+// Training data
+const xs = tf.tensor2d(sentences.map(s=>encode(s)));
+const ys = tf.tensor2d(labels,[labels.length,1]);
+
+// Reshape for RNN
+const xsRNN = xs.reshape([sentences.length,5,1]);
+
+// --------------------
+// Dense Model
+// --------------------
+
+const denseModel = tf.sequential();
+
+denseModel.add(tf.layers.dense({
+units:16,
+activation:'relu',
+inputShape:[5]
+}));
+
+denseModel.add(tf.layers.dense({
+units:1,
+activation:'sigmoid'
+}));
+
+denseModel.compile({
+optimizer:'adam',
+loss:'binaryCrossentropy',
+metrics:['accuracy']
+});
+
+// --------------------
+// RNN Model
+// --------------------
+
+const rnnModel = tf.sequential();
+
+rnnModel.add(tf.layers.lstm({
+units:16,
+inputShape:[5,1]
+}));
+
+rnnModel.add(tf.layers.dense({
+units:1,
+activation:'sigmoid'
+}));
+
+rnnModel.compile({
+optimizer:'adam',
+loss:'binaryCrossentropy',
+metrics:['accuracy']
+});
+
+// Train models
+async function train(){
+
+console.log("Training Dense Model...");
+await denseModel.fit(xs,ys,{epochs:80});
+
+console.log("Training RNN Model...");
+await rnnModel.fit(xsRNN,ys,{epochs:80});
+
+console.log("Models Ready");
+
+}
+
+train();
+
+// Prediction
+async function predict(){
+
+let text = document.getElementById("text").value;
+
+let encoded = encode(text);
+
+let inputDense = tf.tensor2d([encoded]);
+
+let inputRNN = tf.tensor3d([encoded.map(v=>[v])]);
+
+// Dense prediction
+let densePred = denseModel.predict(inputDense);
+let denseScore = (await densePred.data())[0];
+
+// RNN prediction
+let rnnPred = rnnModel.predict(inputRNN);
+let rnnScore = (await rnnPred.data())[0];
+
+let denseSentiment = denseScore > 0.5 ? "Positive" : "Negative";
+let rnnSentiment = rnnScore > 0.5 ? "Positive" : "Negative";
+
+document.getElementById("output").innerHTML =
+
+"<b>Dense Network</b><br>" +
+"Sentiment: " + denseSentiment +
+"<br>Confidence: " + (denseScore*100).toFixed(2) + "%<br><br>" +
+
+"<b>RNN (LSTM)</b><br>" +
+"Sentiment: " + rnnSentiment +
+"<br>Confidence: " + (rnnScore*100).toFixed(2) + "%";
+
+}
+
+</script>
+
+</body>
+</html>

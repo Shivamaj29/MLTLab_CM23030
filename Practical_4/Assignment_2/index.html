@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MobileNet Image Classification Test</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+
+<style>
+
+body{
+font-family: Arial;
+background:#f4f4f4;
+text-align:center;
+padding:30px;
+}
+
+.container{
+background:white;
+width:600px;
+margin:auto;
+padding:20px;
+border-radius:10px;
+box-shadow:0 0 10px gray;
+}
+
+img{
+width:150px;
+margin:10px;
+border-radius:8px;
+}
+
+button{
+padding:10px 20px;
+background:green;
+color:white;
+border:none;
+border-radius:5px;
+cursor:pointer;
+margin-top:10px;
+}
+
+#results{
+margin-top:20px;
+text-align:left;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>MobileNet Classification Accuracy Test</h2>
+
+<p>Testing 5 images</p>
+
+<img id="img1" src="./images/car img.jpg">
+<img id="img2" src="./images/cat.jpg">
+<img id="img3" src="./images/dog.jpg">
+<img id="img4" src="./images/laptop.jpg">
+<img id="img5" src="./images/waterbottle.jpg">
+
+<br>
+
+<button onclick="testImages()">Test Images</button>
+
+<div id="results"></div>
+
+</div>
+
+<script>
+
+let model;
+
+// Expected labels
+const expected = [
+"object",
+"cat",
+"dog",
+"object",
+"dog"
+];
+
+async function loadModel(){
+
+model = await mobilenet.load();
+
+console.log("MobileNet Loaded");
+
+}
+
+loadModel();
+
+async function testImages(){
+
+let correct = 0;
+let output = "<b>Results</b><br><br>";
+
+for(let i=1;i<=5;i++){
+
+let img = document.getElementById("img"+i);
+
+let predictions = await model.classify(img);
+
+let top = predictions[0].className;
+
+output += "Image "+i+" → "+top+"<br>";
+
+if(top.includes(expected[i-1])){
+correct++;
+}
+
+}
+
+let accuracy = (correct/5)*100;
+
+output += "<br><b>Accuracy: "+accuracy.toFixed(2)+"%</b>";
+
+document.getElementById("results").innerHTML = output;
+
+}
+
+</script>
+
+</body>
+</html>

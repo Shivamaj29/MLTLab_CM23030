@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Text Sentiment Analysis</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
+
+<style>
+body{
+    font-family: Arial;
+    background:#f4f4f4;
+    text-align:center;
+    padding:40px;
+}
+
+.container{
+    background:white;
+    padding:30px;
+    border-radius:10px;
+    width:400px;
+    margin:auto;
+    box-shadow:0 0 10px rgba(0,0,0,0.2);
+}
+
+textarea{
+    width:100%;
+    height:80px;
+    margin-top:10px;
+}
+
+button{
+    padding:10px 20px;
+    margin-top:10px;
+    background:#007bff;
+    color:white;
+    border:none;
+    cursor:pointer;
+}
+
+.result{
+    margin-top:20px;
+    font-size:20px;
+    font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h2>Sentiment Analysis (TensorFlow.js)</h2>
+
+<textarea id="textInput" placeholder="Enter a sentence..."></textarea>
+
+<br>
+<button onclick="predictSentiment()">Analyze Sentiment</button>
+
+<div class="result" id="result"></div>
+
+</div>
+
+<script>
+
+// Small Dataset
+const sentences = [
+"I love this product",
+"This is amazing",
+"I am very happy",
+"This is wonderful",
+"I feel great",
+
+"I hate this",
+"This is terrible",
+"I am very sad",
+"This is bad",
+"I dislike this"
+];
+
+const labels = [
+1,1,1,1,1,   // positive
+0,0,0,0,0    // negative
+];
+
+// Simple Vocabulary
+const vocabulary = {};
+let index = 1;
+
+sentences.forEach(sentence=>{
+    sentence.toLowerCase().split(" ").forEach(word=>{
+        if(!vocabulary[word]){
+            vocabulary[word] = index++;
+        }
+    });
+});
+
+// Convert text to numbers
+function encode(sentence){
+    const words = sentence.toLowerCase().split(" ");
+    const arr = new Array(5).fill(0);
+
+    words.slice(0,5).forEach((word,i)=>{
+        arr[i] = vocabulary[word] || 0;
+    });
+
+    return arr;
+}
+
+// Prepare training data
+const xs = tf.tensor2d(sentences.map(s=>encode(s)));
+const ys = tf.tensor2d(labels,[labels.length,1]);
+
+// Create Model
+const model = tf.sequential();
+
+model.add(tf.layers.embedding({
+    inputDim: index+1,
+    outputDim: 8,
+    inputLength:5
+}));
+
+model.add(tf.layers.flatten());
+
+model.add(tf.layers.dense({
+    units:8,
+    activation:'relu'
+}));
+
+model.add(tf.layers.dense({
+    units:1,
+    activation:'sigmoid'
+}));
+
+model.compile({
+    optimizer:'adam',
+    loss:'binaryCrossentropy',
+    metrics:['accuracy']
+});
+
+// Train Model
+async function trainModel(){
+    await model.fit(xs,ys,{
+        epochs:100,
+        shuffle:true
+    });
+    console.log("Model trained");
+}
+
+trainModel();
+
+// Prediction
+async function predictSentiment(){
+
+    const text = document.getElementById("textInput").value;
+
+    const encoded = encode(text);
+
+    const input = tf.tensor2d([encoded]);
+
+    const prediction = model.predict(input);
+
+    const value = (await prediction.data())[0];
+
+    const result = value > 0.5 ? "Positive 😊" : "Negative 😡";
+
+    document.getElementById("result").innerText = result;
+}
+
+</script>
+
+</body>
+</html>

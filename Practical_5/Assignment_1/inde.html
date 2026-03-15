@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Webcam Object Detection - MobileNet</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+
+<style>
+
+body{
+font-family: Arial;
+background: linear-gradient(135deg,#4facfe,#00f2fe);
+text-align:center;
+padding:40px;
+}
+
+.container{
+background:white;
+width:500px;
+margin:auto;
+padding:25px;
+border-radius:12px;
+box-shadow:0 5px 15px rgba(0,0,0,0.2);
+}
+
+h2{
+margin-bottom:10px;
+}
+
+video{
+border-radius:10px;
+border:3px solid #444;
+margin-top:10px;
+}
+
+.buttons{
+margin-top:15px;
+}
+
+button{
+padding:10px 20px;
+margin:5px;
+border:none;
+border-radius:6px;
+font-size:15px;
+cursor:pointer;
+}
+
+.start{
+background:#28a745;
+color:white;
+}
+
+.stop{
+background:#dc3545;
+color:white;
+}
+
+#result{
+margin-top:20px;
+font-size:17px;
+background:#f3f3f3;
+padding:10px;
+border-radius:6px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Webcam Object Classification</h2>
+<p>Using TensorFlow.js MobileNet Model</p>
+
+<video id="webcam" width="400" height="300" autoplay></video>
+
+<div class="buttons">
+<button class="start" onclick="start()">Start Detection</button>
+<button class="stop" onclick="stop()">Stop Detection</button>
+</div>
+
+<div id="result">Prediction will appear here...</div>
+
+</div>
+
+<script>
+
+let model;
+let video = document.getElementById("webcam");
+let stream;
+let running = false;
+
+// Start webcam
+async function startWebcam(){
+
+stream = await navigator.mediaDevices.getUserMedia({
+video:true
+});
+
+video.srcObject = stream;
+
+}
+
+// Load MobileNet
+async function loadModel(){
+
+model = await mobilenet.load();
+console.log("MobileNet Loaded");
+
+}
+
+// Prediction loop
+async function classify(){
+
+if(!running) return;
+
+const predictions = await model.classify(video);
+
+let output = "<b>Top Predictions</b><br>";
+
+predictions.forEach(p => {
+
+output += p.className +
+" : " + (p.probability*100).toFixed(2) +
+"%<br>";
+
+});
+
+document.getElementById("result").innerHTML = output;
+
+requestAnimationFrame(classify);
+
+}
+
+// Start detection
+async function start(){
+
+running = true;
+
+await startWebcam();
+
+if(!model){
+await loadModel();
+}
+
+classify();
+
+}
+
+// Stop detection
+function stop(){
+
+running = false;
+
+if(stream){
+stream.getTracks().forEach(track => track.stop());
+}
+
+document.getElementById("result").innerHTML = "Detection Stopped";
+
+}
+
+</script>
+
+</body>
+</html>
