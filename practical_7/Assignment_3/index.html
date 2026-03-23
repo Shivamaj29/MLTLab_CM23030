@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pose Comparison</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+
+<style>
+body {
+  font-family: Arial;
+  text-align: center;
+  background: linear-gradient(135deg, #a1c4fd, #c2e9fb);
+}
+
+#container {
+  position: relative;
+  display: inline-block;
+  margin-top: 20px;
+}
+
+video, canvas {
+  border-radius: 15px;
+}
+
+canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+button {
+  margin: 10px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 20px;
+  background: #ff7a18;
+  color: white;
+  cursor: pointer;
+}
+
+#info {
+  font-size: 18px;
+  margin-top: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🧠 Single vs Multi Pose Detection</h1>
+
+<div id="container">
+  <video id="video" width="600" height="500" autoplay muted></video>
+  <canvas id="canvas" width="600" height="500"></canvas>
+</div>
+
+<div>
+  <button onclick="start()">▶ Start</button>
+  <button onclick="stop()">⏹ Stop</button>
+  <button onclick="toggleMode()">🔄 Switch Mode</button>
+</div>
+
+<div id="info">Mode: Single Pose</div>
+<div id="score">Accuracy: -</div>
+
+<script>
+
+let video = document.getElementById("video");
+let canvas = document.getElementById("canvas");
+let ctx = canvas.getContext("2d");
+
+let net;
+let stream;
+let running = false;
+let mode = "single"; // single or multi
+
+// Camera setup
+async function setupCamera() {
+  stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  video.srcObject = stream;
+
+  return new Promise(resolve => {
+    video.onloadedmetadata = () => resolve(video);
+  });
+}
+
+// Load PoseNet
+async function loadModel() {
+  net = await posenet.load({
+    architecture: "MobileNetV1",
+    multiplier: 0.75
+  });
+}
+
+// Draw keypoints
+function drawKeypoints(keypoints) {
+  keypoints.forEach(p => {
+    if (p.score > 0.5) {
+      ctx.beginPath();
+      ctx.arc(p.position.x, p.position.y, 5, 0, 2*Math.PI);
+      ctx.fillStyle = "red";
+      ctx.fill();
+    }
+  });
+}
+
+// Draw skeleton
+function drawSkeleton(keypoints) {
+  const pairs = posenet.getAdjacentKeyPoints(keypoints, 0.5);
+
+  pairs.forEach(pair => {
+    ctx.beginPath();
+    ctx.moveTo(pair[0].position.x, pair[0].position.y);
+    ctx.lineTo(pair[1].position.x, pair[1].position.y);
+    ctx.strokeStyle = "green";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+}
+
+// Calculate average confidence (accuracy indicator)
+function getConfidence(keypoints) {
+  let sum = 0;
+  let count = 0;
+
+  keypoints.forEach(k => {
+    if (k.score > 0.3) {
+      sum += k.score;
+      count++;
+    }
+  });
+
+  return (sum / count).toFixed(2);
+}
+
+// Detection loop
+async function detect() {
+  if (!running) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (mode === "single") {
+    const pose = await net.estimateSinglePose(video, { flipHorizontal: true });
+
+    drawKeypoints(pose.keypoints);
+    drawSkeleton(pose.keypoints);
+
+    let conf = getConfidence(pose.keypoints);
+    document.getElementById("score").innerText = "Accuracy: " + conf;
+  } else {
+    const poses = await net.estimateMultiplePoses(video, {
+      flipHorizontal: true,
+      maxDetections: 3
+    });
+
+    let totalConf = 0;
+    let people = poses.length;
+
+    poses.forEach(pose => {
+      drawKeypoints(pose.keypoints);
+      drawSkeleton(pose.keypoints);
+
+      totalConf += parseFloat(getConfidence(pose.keypoints));
+    });
+
+    let avg = people ? (totalConf / people).toFixed(2) : 0;
+    document.getElementById("score").innerText = "Accuracy: " + avg + " (avg)";
+  }
+
+  requestAnimationFrame(detect);
+}
+
+// Start
+async function start() {
+  if (running) return;
+
+  running = true;
+
+  await setupCamera();
+  await loadModel();
+
+  video.play();
+  detect();
+}
+
+// Stop
+function stop() {
+  running = false;
+
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// Toggle mode
+function toggleMode() {
+  mode = (mode === "single") ? "multi" : "single";
+
+  document.getElementById("info").innerText =
+    "Mode: " + (mode === "single" ? "Single Pose" : "Multi Pose");
+}
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Squat Counter (PoseNet)</title>
+
+  <!-- TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+  <!-- PoseNet -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      text-align: center;
+      background: linear-gradient(135deg, #f6d365, #fda085);
+    }
+
+    h1 {
+      margin-top: 15px;
+    }
+
+    #container {
+      position: relative;
+      display: inline-block;
+      margin-top: 20px;
+      border-radius: 15px;
+      overflow: hidden;
+    }
+
+    video, canvas {
+      border-radius: 15px;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    button {
+      margin: 10px;
+      padding: 10px 25px;
+      border: none;
+      border-radius: 20px;
+      background: #ff4d6d;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    #count {
+      font-size: 30px;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🏋️ Squat Counter (PoseNet)</h1>
+
+<div id="container">
+  <video id="video" width="600" height="500" autoplay muted></video>
+  <canvas id="canvas" width="600" height="500"></canvas>
+</div>
+
+<div>
+  <button onclick="start()">▶ Start</button>
+  <button onclick="stop()">⏹ Stop</button>
+</div>
+
+<div id="count">Reps: 0</div>
+
+<script>
+
+let video = document.getElementById("video");
+let canvas = document.getElementById("canvas");
+let ctx = canvas.getContext("2d");
+
+let net;
+let stream;
+let running = false;
+
+let count = 0;
+let stage = "up"; // up or down
+
+// Setup Camera
+async function setupCamera() {
+  stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  video.srcObject = stream;
+
+  return new Promise(resolve => {
+    video.onloadedmetadata = () => resolve(video);
+  });
+}
+
+// Load Model
+async function loadModel() {
+  net = await posenet.load({
+    architecture: "MobileNetV1",
+    inputResolution: { width: 600, height: 500 },
+    multiplier: 0.75
+  });
+}
+
+// Calculate Angle
+function calculateAngle(a, b, c) {
+  let ab = { x: a.x - b.x, y: a.y - b.y };
+  let cb = { x: c.x - b.x, y: c.y - b.y };
+
+  let dot = (ab.x * cb.x + ab.y * cb.y);
+  let magAB = Math.sqrt(ab.x * ab.x + ab.y * ab.y);
+  let magCB = Math.sqrt(cb.x * cb.x + cb.y * cb.y);
+
+  let angle = Math.acos(dot / (magAB * magCB));
+  return angle * (180 / Math.PI);
+}
+
+// Draw points
+function drawPoint(x, y) {
+  ctx.beginPath();
+  ctx.arc(x, y, 5, 0, 2 * Math.PI);
+  ctx.fillStyle = "red";
+  ctx.fill();
+}
+
+// Detection
+async function detect() {
+  if (!running) return;
+
+  const pose = await net.estimateSinglePose(video, {
+    flipHorizontal: true
+  });
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  let keypoints = pose.keypoints;
+
+  let hip = keypoints.find(k => k.part === "leftHip");
+  let knee = keypoints.find(k => k.part === "leftKnee");
+  let ankle = keypoints.find(k => k.part === "leftAnkle");
+
+  if (hip.score > 0.5 && knee.score > 0.5 && ankle.score > 0.5) {
+
+    drawPoint(hip.position.x, hip.position.y);
+    drawPoint(knee.position.x, knee.position.y);
+    drawPoint(ankle.position.x, ankle.position.y);
+
+    let angle = calculateAngle(
+      hip.position,
+      knee.position,
+      ankle.position
+    );
+
+    // Show angle
+    ctx.fillStyle = "black";
+    ctx.font = "20px Arial";
+    ctx.fillText("Angle: " + Math.round(angle), 20, 30);
+
+    // Logic
+    if (angle < 90) {
+      stage = "down";
+    }
+
+    if (angle > 160 && stage === "down") {
+      stage = "up";
+      count++;
+      document.getElementById("count").innerText = "Reps: " + count;
+    }
+  }
+
+  requestAnimationFrame(detect);
+}
+
+// Start
+async function start() {
+  if (running) return;
+
+  running = true;
+  count = 0;
+  stage = "up";
+  document.getElementById("count").innerText = "Reps: 0";
+
+  await setupCamera();
+  await loadModel();
+
+  video.play();
+  detect();
+}
+
+// Stop
+function stop() {
+  running = false;
+
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+</script>
+
+</body>
+</html>
